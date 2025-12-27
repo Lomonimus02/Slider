@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Touch Slider - FreeMode & Snap</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .controls {
+            max-width: 600px;
+            margin: 0 auto 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .control-group {
+            margin-bottom: 10px;
+        }
+        
+        .control-group label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .control-group input[type="radio"] {
+            margin-right: 8px;
+        }
+        
+        .control-group select {
+            margin-left: 8px;
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Touch Slider: FreeMode & Snap</h1>
+        
+        <!-- Панель управления -->
+        <div class="controls">
+            <div class="control-group">
+                <label>
+                    <input type="radio" name="mode" value="free" checked>
+                    FreeMode (свободное движение)
+                </label>
+            </div>
+            <div class="control-group">
+                <label>
+                    <input type="radio" name="mode" value="snap">
+                    Snap режим (прилипание к слайдам)
+                </label>
+                <select id="snapAlign">
+                    <option value="start">По левому краю</option>
+                    <option value="center">По центру</option>
+                </select>
+            </div>
+            <div class="info">
+                <strong>FreeMode:</strong> Слайдер движется свободно, останавливается там, где закончилась инерция.<br>
+                <strong>Snap:</strong> Слайдер автоматически прилипает к ближайшему слайду. Быстрый свайп пропускает несколько слайдов.
+            </div>
+        </div>
+        
+        <!-- Структура слайдера -->
+        <div class="slider" id="touchSlider">
+            <div class="slider__track">
+                <div class="slider__slide">
+                    <div class="slide-content">Слайд 1</div>
+                </div>
+                <div class="slider__slide">
+                    <div class="slide-content">Слайд 2</div>
+                </div>
+                <div class="slider__slide">
+                    <div class="slide-content">Слайд 3</div>
+                </div>
+                <div class="slider__slide">
+                    <div class="slide-content">Слайд 4</div>
+                </div>
+                <div class="slider__slide">
+                    <div class="slide-content">Слайд 5</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="TouchSlider.js"></script>
+    <script>
+        // Функция настройки слушателей событий
+        function setupEventListeners(sliderInstance) {
+            // Событие начала перетаскивания
+            sliderInstance.on('sliderDragStart', (e) => {
+                console.log('🔵 sliderDragStart:', e.detail);
+            });
+            
+            // Событие перетаскивания
+            sliderInstance.on('sliderDrag', (e) => {
+                // Закомментировано чтобы не спамить консоль
+                // console.log('🟡 sliderDrag:', e.detail);
+            });
+            
+            // Событие завершения перетаскивания
+            sliderInstance.on('sliderDragEnd', (e) => {
+                console.log('🔴 sliderDragEnd:', e.detail);
+            });
+            
+            // Событие движения слайдера (во время инерции/анимации)
+            sliderInstance.on('sliderMove', (e) => {
+                // Закомментировано чтобы не спамить консоль
+                // console.log('➡️ sliderMove:', e.detail);
+            });
+            
+            // Событие полной остановки слайдера
+            sliderInstance.on('sliderStop', (e) => {
+                console.log('⏸️ sliderStop:', e.detail);
+            });
+            
+            // Событие смены активного слайда
+            sliderInstance.on('slideChange', (e) => {
+                console.log('🔄 slideChange:', e.detail);
+            });
+            
+            // Событие начала snap анимации
+            sliderInstance.on('sliderSnapStart', (e) => {
+                console.log('🎯 sliderSnapStart:', e.detail);
+            });
+            
+            // Событие завершения snap анимации
+            sliderInstance.on('sliderSnapComplete', (e) => {
+                console.log('✅ sliderSnapComplete:', e.detail);
+            });
+            
+            // Событие ручной остановки инерции
+            sliderInstance.on('manualStop', (e) => {
+                console.log('✋ manualStop:', e.detail);
+            });
+            
+            // Событие появления последнего слайда (начало)
+            sliderInstance.on('lastSlideVisibleStart', (e) => {
+                console.log('👁️ lastSlideVisibleStart:', e.detail);
+            });
+            
+            // Событие полной видимости последнего слайда
+            sliderInstance.on('lastSlideVisibleFull', (e) => {
+                console.log('👁️👁️ lastSlideVisibleFull:', e.detail);
+            });
+        }
+        
+        // Инициализация слайдера
+        document.addEventListener('DOMContentLoaded', () => {
+            let slider = new TouchSlider('#touchSlider', {
+                freeMode: true,
+                snapAlign: 'start'
+            });
+            
+            // Настройка слушателей событий через API
+            setupEventListeners(slider);
+
+            // Переключение режимов
+            const radioButtons = document.querySelectorAll('input[name="mode"]');
+            const snapAlignSelect = document.getElementById('snapAlign');
+
+            radioButtons.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    const freeMode = e.target.value === 'free';
+                    const snapAlign = snapAlignSelect.value;
+                    
+                    // Пересоздаем слайдер с новыми настройками
+                    slider.destroy();
+                    slider = new TouchSlider('#touchSlider', {
+                        freeMode: freeMode,
+                        snapAlign: snapAlign
+                    });
+                    
+                    // Подключаем события к новому экземпляру
+                    setupEventListeners(slider);
+                    
+                    console.log(`Режим изменен: ${freeMode ? 'FreeMode' : 'Snap'}, align: ${snapAlign}`);
+                });
+            });
+
+            snapAlignSelect.addEventListener('change', () => {
+                const freeMode = document.querySelector('input[name="mode"]:checked').value === 'free';
+                const snapAlign = snapAlignSelect.value;
+                
+                slider.destroy();
+                slider = new TouchSlider('#touchSlider', {
+                    freeMode: freeMode,
+                    snapAlign: snapAlign
+                });
+                
+                // Подключаем события к новому экземпляру
+                setupEventListeners(slider);
+                
+                console.log(`Выравнивание изменено: ${snapAlign}`);
+            });
+        });
+    </script>
+</body>
+</html>
