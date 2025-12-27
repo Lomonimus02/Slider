@@ -79,6 +79,7 @@ class TouchSlider {
             currentY: 0,            // Текущая Y координата касания
             startTime: 0,           // Время начала касания (для расчета скорости)
             startPositionX: 0,      // Позиция трека в момент начала касания
+            isTouching: false,      // Флаг: палец на экране (до определения направления)
             isDirectionDetermined: false, // Флаг: определено ли направление свайпа
             isHorizontalSwipe: false,     // Флаг: горизонтальный ли это свайп
             velocityX: 0,           // Текущая скорость движения по X
@@ -208,6 +209,7 @@ class TouchSlider {
     /**
      * Обработчик начала касания (touchstart)
      * Запоминаем начальные координаты, время и позицию трека
+     * НЕ устанавливаем isDragging - это произойдет только после определения направления
      */
     handleTouchStart(e) {
         const touch = e.touches[0];
@@ -228,13 +230,16 @@ class TouchSlider {
         this.touch.isDirectionDetermined = false;
         this.touch.isHorizontalSwipe = false;
         
+        // Флаг что касание активно (но направление еще не определено)
+        this.touch.isTouching = true;
+        
         // Останавливаем текущую инерцию (если слайдер двигался)
-        // Останавливаем RAF анимацию
         const wasAnimating = this.animation.isAnimating;
         if (this.animation.rafId) {
             cancelAnimationFrame(this.animation.rafId);
             this.animation.rafId = null;
             this.animation.isAnimating = false;
+            this.state.isSnapping = false;
             
             // Генерируем событие manualStop если пользователь остановил инерцию
             if (wasAnimating) {
@@ -257,124 +262,112 @@ class TouchSlider {
             time: Date.now()
         });
         
-        // Устанавливаем флаг активного перетаскивания
-        this.state.isDragging = true;
-        
-        // Добавляем класс для визуального состояния перетаскивания
-        this.slider.classList.add('slider--dragging');
-        
-        // Генерируем кастомное событие sliderDragStart
-        this.dispatchEvent('sliderDragStart', {
-            startX: this.touch.startX,
-            startY: this.touch.startY,
-            currentPosition: this.state.currentX
-        });
+        // НЕ устанавливаем isDragging здесь!
+        // isDragging будет установлен только когда определим горизонтальный свайп
     }
 
     handleTouchMove(e) {
-        // Если перетаскивание не активно, ничего не делаем
-        if (!this.state.isDragging) {
+        // Если касание не активно, ничего не делаем
+        if (!this.touch.isTouching) {
             return;
         }
         
         const touch = e.touches[0];
         
+        // Сохраняем предыдущие координаты для расчета дельты движения
+        const prevX = this.touch.currentX;
+        const prevY = this.touch.currentY;
+        
         // Обновляем текущие координаты
         this.touch.currentX = touch.clientX;
         this.touch.currentY = touch.clientY;
         
-        // Вычисляем дельту (смещение от начальной точки)
+        // Вычисляем дельту от НАЧАЛА касания (для определения направления)
         const deltaX = this.touch.currentX - this.touch.startX;
         const deltaY = this.touch.currentY - this.touch.startY;
         
+        // Вычисляем дельту движения в ЭТОМ кадре (для скролла)
+        const frameDeltaY = this.touch.currentY - prevY;
+        
         /**
-         * КРИТИЧЕСКИ ВАЖНАЯ ЛОГИКА: Определение направления свайпа
+         * ОПРЕДЕЛЕНИЕ НАПРАВЛЕНИЯ СВАЙПА
          * 
-         * Проверяем направление только один раз при первом значительном движении (>5px).
+         * Используем увеличенный порог (10px) для надежного определения.
          * Угол допуска: ±80 градусов относительно горизонтальной оси.
-         * 
-         * Математика:
-         * - Если представить координатную плоскость, горизонтальная ось = 0°
-         * - Угол от горизонтали: angle = atan(deltaY / deltaX)
-         * - 80° от горизонтали означает, что tan(80°) ≈ 5.67
-         * - Проверка: если |deltaY| / |deltaX| < tan(80°), то это горизонтальный свайп
-         * 
-         * Упрощенная проверка:
-         * - Math.abs(deltaY) / Math.abs(deltaX) < 5.67 → горизонтальный свайп
-         * - В противном случае → вертикальный свайп (разрешаем нативный скролл)
+         * tan(80°) ≈ 5.6713
          */
         if (!this.touch.isDirectionDetermined) {
-            // Порог для определения направления (5px - достаточный сдвиг)
-            const threshold = 5;
-            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const threshold = 10; // Увеличенный порог для надежности
+            const absDeltaX = Math.abs(deltaX);
+            const absDeltaY = Math.abs(deltaY);
             
-            if (distance > threshold) {
-                // Направление определено, фиксируем результат
+            // Проверяем достигнут ли порог хотя бы по одной оси
+            if (absDeltaX > threshold || absDeltaY > threshold) {
                 this.touch.isDirectionDetermined = true;
                 
-                // tan(80°) ≈ 5.6713 - критерий для угла ±80 градусов
+                // tan(80°) ≈ 5.6713 - если deltaY/deltaX < 5.67, это горизонтальный свайп
                 const tan80deg = 5.6713;
-                const absDeltaX = Math.abs(deltaX);
-                const absDeltaY = Math.abs(deltaY);
                 
-                // Защита от деления на ноль
                 if (absDeltaX === 0) {
                     // Чисто вертикальное движение
                     this.touch.isHorizontalSwipe = false;
                 } else {
-                    // Проверяем угол: если отношение deltaY/deltaX меньше tan(80°),
-                    // то это горизонтальный свайп
                     const ratio = absDeltaY / absDeltaX;
                     this.touch.isHorizontalSwipe = ratio < tan80deg;
+                }
+                
+                // Если горизонтальный свайп - активируем режим перетаскивания слайдера
+                if (this.touch.isHorizontalSwipe) {
+                    this.state.isDragging = true;
+                    this.slider.classList.add('slider--dragging');
+                    
+                    // Генерируем событие начала перетаскивания
+                    this.dispatchEvent('sliderDragStart', {
+                        startX: this.touch.startX,
+                        startY: this.touch.startY,
+                        currentPosition: this.state.currentX
+                    });
                 }
             }
         }
         
-        // Если направление определено и это горизонтальный свайп
+        // Блокируем дефолтное поведение в любом случае (у нас touch-action: none)
+        e.preventDefault();
+        
+        // ГОРИЗОНТАЛЬНЫЙ СВАЙП - двигаем слайдер
         if (this.touch.isDirectionDetermined && this.touch.isHorizontalSwipe) {
-            // БЛОКИРУЕМ нативный скролл страницы (критически важно!)
-            e.preventDefault();
-            
-            // Вычисляем новую позицию: начальная позиция трека + смещение пальца
+            // Вычисляем новую позицию трека
             let newPositionX = this.touch.startPositionX + deltaX;
             
-            // Применяем эффект резиновых краев (rubber band) если тянем за границу
-            // Это создает сопротивление при попытке выйти за пределы
+            // Применяем эффект резиновых краев
             newPositionX = this.applyRubberBand(newPositionX, deltaX);
             
-            // Применяем новую позицию к треку
+            // Применяем позицию
             this.state.currentX = newPositionX;
             this.state.targetX = newPositionX;
             this.track.style.transform = `translate3d(${newPositionX}px, 0, 0)`;
             
-            // ВАЖНО: Добавляем текущую позицию в историю для расчета скорости
-            // Это решает проблему рывков после отпускания пальца
+            // Записываем в историю для расчета скорости
             const now = Date.now();
-            this.touch.history.push({
-                x: newPositionX,
-                time: now
-            });
+            this.touch.history.push({ x: newPositionX, time: now });
             
-            // Ограничиваем размер истории (оставляем только последние 150мс для надежности)
-            // Очищаем старые записи
-            const historyTimeWindow = 150;
+            // Очищаем старые записи (оставляем последние 150мс)
             this.touch.history = this.touch.history.filter(
-                point => now - point.time <= historyTimeWindow
+                point => now - point.time <= 150
             );
             
+        // ВЕРТИКАЛЬНЫЙ СВАЙП - скроллим страницу вручную
         } else if (this.touch.isDirectionDetermined && !this.touch.isHorizontalSwipe) {
-            // Вертикальный свайп (>80°) - разрешаем нативный скролл
-            // НЕ вызываем preventDefault(), браузер обработает скролл сам
-            // НЕ двигаем слайдер
-            
-            // Отменяем режим перетаскивания, так как это вертикальный скролл
-            this.state.isDragging = false;
-            this.slider.classList.remove('slider--dragging');
+            // Скроллим страницу программно (т.к. touch-action: none)
+            window.scrollBy(0, -frameDeltaY);
         }
     }
 
     handleTouchEnd(e) {
-        // Если перетаскивание не было активно, ничего не делаем
+        // Сбрасываем флаг касания
+        this.touch.isTouching = false;
+        
+        // Если это был не горизонтальный свайп (или направление не определено) - выходим
         if (!this.state.isDragging) {
             return;
         }
@@ -384,29 +377,23 @@ class TouchSlider {
         const deltaY = this.touch.currentY - this.touch.startY;
         const deltaTime = Date.now() - this.touch.startTime;
         
-        // КРИТИЧЕСКИ ВАЖНО: Используем метод calculateVelocity() на основе истории
-        // Это решает проблему рывков, которая есть в Swiper
-        // Расчет идет по истории за последние 100мс, а не по одной точке
-        // Умножаем на 16 для имитации ~60fps (скорость в пикселях за кадр)
+        // Расчет скорости по истории за последние 100мс
+        // Умножаем на 16 для ~60fps (скорость в пикселях за кадр)
         this.touch.velocityX = this.calculateVelocity() * 16;
         
         // Снимаем флаг перетаскивания
         this.state.isDragging = false;
         
-        // Убираем визуальный класс перетаскивания
+        // Убираем визуальный класс
         this.slider.classList.remove('slider--dragging');
         
-        /**
-         * Запускаем инерцию для ОБОИХ режимов
-         * В Snap режиме: сначала инерция, потом автоматический snap когда скорость снизится
-         * В Free режиме: только инерция до полной остановки
-         */
+        // Запускаем инерцию
         if (!this.animation.isAnimating) {
             this.animation.isAnimating = true;
             this.animate();
         }
         
-        // Генерируем кастомное событие sliderDragEnd
+        // Генерируем событие sliderDragEnd
         this.dispatchEvent('sliderDragEnd', {
             endX: this.touch.currentX,
             endY: this.touch.currentY,
