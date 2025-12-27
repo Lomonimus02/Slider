@@ -233,22 +233,9 @@ class TouchSlider {
         // Флаг что касание активно (но направление еще не определено)
         this.touch.isTouching = true;
         
-        // Останавливаем текущую инерцию (если слайдер двигался)
-        const wasAnimating = this.animation.isAnimating;
-        if (this.animation.rafId) {
-            cancelAnimationFrame(this.animation.rafId);
-            this.animation.rafId = null;
-            this.animation.isAnimating = false;
-            this.state.isSnapping = false;
-            
-            // Генерируем событие manualStop если пользователь остановил инерцию
-            if (wasAnimating) {
-                this.dispatchEvent('manualStop', {
-                    position: this.state.currentX,
-                    velocity: this.touch.velocityX
-                });
-            }
-        }
+        // НЕ останавливаем snap анимацию сразу!
+        // Остановим только если определим горизонтальный свайп
+        // Это позволяет скроллить вертикально во время snap анимации
         
         // Обнуляем скорость для инерции
         this.touch.velocityX = 0;
@@ -318,6 +305,23 @@ class TouchSlider {
                 
                 // Если горизонтальный свайп - активируем режим перетаскивания слайдера
                 if (this.touch.isHorizontalSwipe) {
+                    // ТЕПЕРЬ останавливаем анимацию (только при горизонтальном свайпе)
+                    if (this.animation.rafId) {
+                        cancelAnimationFrame(this.animation.rafId);
+                        this.animation.rafId = null;
+                        this.animation.isAnimating = false;
+                        
+                        // Генерируем событие manualStop
+                        this.dispatchEvent('manualStop', {
+                            position: this.state.currentX,
+                            velocity: this.touch.velocityX
+                        });
+                    }
+                    this.state.isSnapping = false;
+                    
+                    // Обновляем начальную позицию трека на текущую
+                    this.touch.startPositionX = this.state.currentX;
+                    
                     this.state.isDragging = true;
                     this.slider.classList.add('slider--dragging');
                     
@@ -476,9 +480,10 @@ class TouchSlider {
             // Вычисляем разницу между текущей и целевой позицией
             const diff = this.state.snapTargetX - this.state.currentX;
             
-            // Плавно приближаемся к целевой позиции
-            // snapSpeed определяет скорость довода (0.1-0.3)
-            this.state.currentX += diff * this.options.snapSpeed;
+            // Плавная анимация с easing (как на Авито)
+            // Используем более агрессивный коэффициент для быстрого завершения
+            const snapEasing = 0.15; // Быстрее чем snapSpeed
+            this.state.currentX += diff * snapEasing;
             
             // Если очень близко к целевой позиции, фиксируем
             if (Math.abs(diff) < 0.5) {
