@@ -27,17 +27,17 @@ class TouchSlider {
 
         // Настройки по умолчанию
         this.options = {
-            // Физика
-            friction: 0.95,           // Коэффициент трения для инерции (0.9-0.98)
-            bounce: 0.1,              // Сила отскока от краев (0.05-0.15)
-            rubberBandEffect: 0.3,    // Коэффициент сопротивления при перетаскивании за границы
-            velocityThreshold: 0.1,   // Минимальная скорость для продолжения инерции
+            // Физика (оптимизированные значения для естественного поведения)
+            friction: 0.92,           // Коэффициент трения - быстрее затухание (0.9-0.98)
+            bounce: 0.15,             // Сила отскока от краев - более выраженный (0.05-0.2)
+            rubberBandEffect: 0.25,   // Коэффициент сопротивления - более упругое (0.2-0.4)
+            velocityThreshold: 0.15,  // Минимальная скорость для продолжения инерции
             
             // Режимы движения
             freeMode: true,           // true: свободное движение, false: snap к слайдам
             snapAlign: 'start',       // 'start': слайд по левому краю, 'center': слайд по центру
             snapSpeed: 0.12,          // Скорость довода до слайда (0.05-0.2, меньше = плавнее)
-            velocityMultiplier: 2,    // Множитель скорости для определения целевого слайда
+            velocityMultiplier: 1.5,  // Множитель скорости - умеренная инерция (1.0-2.5)
             
             ...options
         };
@@ -387,7 +387,8 @@ class TouchSlider {
         // КРИТИЧЕСКИ ВАЖНО: Используем метод calculateVelocity() на основе истории
         // Это решает проблему рывков, которая есть в Swiper
         // Расчет идет по истории за последние 100мс, а не по одной точке
-        this.touch.velocityX = this.calculateVelocity();
+        // Умножаем на 16 для имитации ~60fps (скорость в пикселях за кадр)
+        this.touch.velocityX = this.calculateVelocity() * 16;
         
         // Снимаем флаг перетаскивания
         this.state.isDragging = false;
@@ -396,46 +397,13 @@ class TouchSlider {
         this.slider.classList.remove('slider--dragging');
         
         /**
-         * SNAP РЕЖИМ: Сразу активируем snap после отпускания пальца
+         * Запускаем инерцию для ОБОИХ режимов
+         * В Snap режиме: сначала инерция, потом автоматический snap когда скорость снизится
+         * В Free режиме: только инерция до полной остановки
          */
-        if (!this.options.freeMode) {
-            // Находим ближайший слайд с учетом скорости свайпа
-            const nearestSlide = this.findNearestSlide(this.state.currentX, this.touch.velocityX);
-            
-            this.state.isSnapping = true;
-            this.state.snapTargetX = nearestSlide.position;
-            
-            // Проверяем изменение слайда
-            if (nearestSlide.index !== this.state.currentSlideIndex) {
-                this.state.previousSlideIndex = this.state.currentSlideIndex;
-                this.state.currentSlideIndex = nearestSlide.index;
-                
-                // Генерируем событие смены слайда
-                this.dispatchEvent('slideChange', {
-                    slideIndex: this.state.currentSlideIndex,
-                    previousIndex: this.state.previousSlideIndex
-                });
-            } else {
-                this.state.currentSlideIndex = nearestSlide.index;
-            }
-            
-            // Генерируем событие начала snap
-            this.dispatchEvent('sliderSnapStart', {
-                slideIndex: nearestSlide.index,
-                targetPosition: nearestSlide.position
-            });
-            
-            // Запускаем анимацию snap
-            if (!this.animation.isAnimating) {
-                this.animation.isAnimating = true;
-                this.animate();
-            }
-        } else {
-            // FreeMode - запускаем инерцию
-            if (!this.animation.isAnimating) {
-                this.animation.isAnimating = true;
-                this.animate();
-            }
+        if (!this.animation.isAnimating) {
+            this.animation.isAnimating = true;
+            this.animate();
         }
         
         // Генерируем кастомное событие sliderDragEnd
@@ -581,17 +549,37 @@ class TouchSlider {
         if (!this.state.isDragging) {
             this.touch.velocityX *= this.options.friction;
             
-            // Если скорость мала и режим freeMode, останавливаемся
-            if (this.options.freeMode && Math.abs(this.touch.velocityX) < this.options.velocityThreshold) {
-                // Проверяем, не за границами ли мы
-                if (this.state.currentX > bounds.max || this.state.currentX < bounds.min) {
-                    // За границами - продолжаем анимацию возврата
+            // Проверяем активацию snap в Snap режиме когда скорость снизилась
+            if (!this.options.freeMode && !this.state.isSnapping && Math.abs(this.touch.velocityX) < this.options.velocityThreshold * 3) {
+                // Скорость достаточно снизилась - активируем snap
+                const nearestSlide = this.findNearestSlide(this.state.currentX, this.touch.velocityX);
+                
+                this.state.isSnapping = true;
+                this.state.snapTargetX = nearestSlide.position;
+                
+                // Проверяем изменение слайда
+                if (nearestSlide.index !== this.state.currentSlideIndex) {
+                    this.state.previousSlideIndex = this.state.currentSlideIndex;
+                    this.state.currentSlideIndex = nearestSlide.index;
+                    
+                    // Генерируем событие смены слайда
+                    this.dispatchEvent('slideChange', {
+                        slideIndex: this.state.currentSlideIndex,
+                        previousIndex: this.state.previousSlideIndex
+                    });
                 } else {
-                    // В пределах границ и скорость мала - останавливаемся
-                    this.animation.isAnimating = false;
-                    this.animation.rafId = null;
-                    return;
+                    this.state.currentSlideIndex = nearestSlide.index;
                 }
+                
+                // Генерируем событие начала snap
+                this.dispatchEvent('sliderSnapStart', {
+                    slideIndex: nearestSlide.index,
+                    targetPosition: nearestSlide.position
+                });
+                
+                // Переключаемся в режим snap (вернемся в начало цикла animate)
+                this.animation.rafId = requestAnimationFrame(this.animate);
+                return;
             }
         }
         
@@ -656,8 +644,10 @@ class TouchSlider {
         }
         
         // Проверяем остановку в free mode (когда velocity близка к 0)
-        if (Math.abs(this.touch.velocityX) < 0.1) {
+        if (Math.abs(this.touch.velocityX) < this.options.velocityThreshold) {
             this.touch.velocityX = 0;
+            this.animation.isAnimating = false;
+            this.animation.rafId = null;
             
             // Генерируем событие полной остановки
             this.dispatchEvent('sliderStop', {
