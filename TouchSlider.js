@@ -335,11 +335,10 @@ class TouchSlider {
             }
         }
         
-        // Блокируем дефолтное поведение в любом случае (у нас touch-action: none)
-        e.preventDefault();
-        
         // ГОРИЗОНТАЛЬНЫЙ СВАЙП - двигаем слайдер
         if (this.touch.isDirectionDetermined && this.touch.isHorizontalSwipe) {
+            // Блокируем дефолтное поведение ТОЛЬКО для горизонтального свайпа
+            e.preventDefault();
             // Вычисляем новую позицию трека
             let newPositionX = this.touch.startPositionX + deltaX;
             
@@ -359,12 +358,9 @@ class TouchSlider {
             this.touch.history = this.touch.history.filter(
                 point => now - point.time <= 150
             );
-            
-        // ВЕРТИКАЛЬНЫЙ СВАЙП - скроллим страницу вручную
-        } else if (this.touch.isDirectionDetermined && !this.touch.isHorizontalSwipe) {
-            // Скроллим страницу программно (т.к. touch-action: none)
-            window.scrollBy(0, -frameDeltaY);
         }
+        // Вертикальный свайп - нативный скролл работает автоматически
+        // (e.preventDefault не вызывался)
     }
 
     handleTouchEnd(e) {
