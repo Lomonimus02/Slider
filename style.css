@@ -17,10 +17,8 @@ body {
     position: relative;
     background: #fff;
     margin-bottom: 20px;
-    /* We remove touch-action: pan-y to handle gestures manually with JS 
-       and support the custom angle threshold. 
-       We will use { passive: false } in JS listeners. */
-    /* touch-action: pan-y; */ 
+    /* Allow vertical scrolling (pan-y), but reserve horizontal gestures for JS */
+    touch-action: pan-y;
 }
 
 .slider-wrapper {
