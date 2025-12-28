@@ -25,19 +25,19 @@ class TouchSlider {
             throw new Error('TouchSlider: элемент не найден');
         }
 
-        // Настройки по умолчанию (Авито-стиль)
+        // Настройки по умолчанию
         this.options = {
-            // Физика (Авито-подобное поведение)
-            friction: 0.94,           // Коэффициент трения - плавное затухание (0.9-0.98)
-            bounce: 0.12,             // Сила отскока от краев - мягкий (0.05-0.2)
-            rubberBandEffect: 0.2,    // Коэффициент сопротивления - упругое (0.2-0.4)
-            velocityThreshold: 0.1,   // Минимальная скорость для продолжения инерции
+            // Физика (оптимизированные значения для естественного поведения)
+            friction: 0.92,           // Коэффициент трения - быстрее затухание (0.9-0.98)
+            bounce: 0.15,             // Сила отскока от краев - более выраженный (0.05-0.2)
+            rubberBandEffect: 0.25,   // Коэффициент сопротивления - более упругое (0.2-0.4)
+            velocityThreshold: 0.15,  // Минимальная скорость для продолжения инерции
             
-            // Режимы движения (Авито = Snap по центру)
-            freeMode: false,          // false: snap к слайдам (как Авито)
-            snapAlign: 'center',      // 'center': слайд по центру (как Авито)
-            snapSpeed: 0.15,          // Скорость довода до слайда (0.05-0.2)
-            velocityMultiplier: 1.2,  // Множитель скорости - умеренная инерция
+            // Режимы движения
+            freeMode: true,           // true: свободное движение, false: snap к слайдам
+            snapAlign: 'start',       // 'start': слайд по левому краю, 'center': слайд по центру
+            snapSpeed: 0.12,          // Скорость довода до слайда (0.05-0.2, меньше = плавнее)
+            velocityMultiplier: 1.5,  // Множитель скорости - умеренная инерция (1.0-2.5)
             
             ...options
         };
@@ -189,10 +189,10 @@ class TouchSlider {
         this.handleTouchMove = this.handleTouchMove.bind(this);
         this.handleTouchEnd = this.handleTouchEnd.bind(this);
 
-        this.slider.addEventListener('touchstart', this.handleTouchStart, { passive: true });
+        this.slider.addEventListener('touchstart', this.handleTouchStart, { passive: false });
         this.slider.addEventListener('touchmove', this.handleTouchMove, { passive: false });
-        this.slider.addEventListener('touchend', this.handleTouchEnd, { passive: true });
-        this.slider.addEventListener('touchcancel', this.handleTouchEnd, { passive: true });
+        this.slider.addEventListener('touchend', this.handleTouchEnd);
+        this.slider.addEventListener('touchcancel', this.handleTouchEnd);
 
         // Mouse события (для тестирования на desktop)
         this.handleMouseDown = this.handleMouseDown.bind(this);
@@ -305,9 +305,6 @@ class TouchSlider {
                 
                 // Если горизонтальный свайп - активируем режим перетаскивания слайдера
                 if (this.touch.isHorizontalSwipe) {
-                    // Блокируем нативный скролл только сейчас, когда точно знаем что это горизонтальный свайп
-                    this.slider.style.touchAction = 'none';
-                    
                     // ТЕПЕРЬ останавливаем анимацию (только при горизонтальном свайпе)
                     if (this.animation.rafId) {
                         cancelAnimationFrame(this.animation.rafId);
@@ -338,10 +335,11 @@ class TouchSlider {
             }
         }
         
+        // Блокируем дефолтное поведение в любом случае (у нас touch-action: none)
+        e.preventDefault();
+        
         // ГОРИЗОНТАЛЬНЫЙ СВАЙП - двигаем слайдер
         if (this.touch.isDirectionDetermined && this.touch.isHorizontalSwipe) {
-            // Блокируем дефолтное поведение ТОЛЬКО для горизонтального свайпа
-            e.preventDefault();
             // Вычисляем новую позицию трека
             let newPositionX = this.touch.startPositionX + deltaX;
             
@@ -361,17 +359,17 @@ class TouchSlider {
             this.touch.history = this.touch.history.filter(
                 point => now - point.time <= 150
             );
+            
+        // ВЕРТИКАЛЬНЫЙ СВАЙП - скроллим страницу вручную
+        } else if (this.touch.isDirectionDetermined && !this.touch.isHorizontalSwipe) {
+            // Скроллим страницу программно (т.к. touch-action: none)
+            window.scrollBy(0, -frameDeltaY);
         }
-        // Вертикальный свайп - нативный скролл работает автоматически
-        // (e.preventDefault не вызывался)
     }
 
     handleTouchEnd(e) {
         // Сбрасываем флаг касания
         this.touch.isTouching = false;
-        
-        // Возвращаем touch-action к исходному значению
-        this.slider.style.touchAction = '';
         
         // Если это был не горизонтальный свайп (или направление не определено) - выходим
         if (!this.state.isDragging) {
