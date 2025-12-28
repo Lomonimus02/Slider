@@ -15,7 +15,7 @@ class TouchSlider {
         this.options = {
             freeMode: options.freeMode !== undefined ? options.freeMode : false,
             friction: options.friction || 0.95, // Inertia friction
-            angleThreshold: options.angleThreshold || 65, // Degrees - increased to prioritize horizontal swipe
+            angleThreshold: options.angleThreshold || 45, // Degrees - stricter to prevent accidental locks
             speed: options.speed || 300, // ms for snap animation
             resistanceRatio: 0.5, // Resistance when pulling out of bounds
             springK: 0.05, // Spring stiffness for rubber band (Lowered for softer bounce)

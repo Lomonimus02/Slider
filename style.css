@@ -22,8 +22,8 @@ body {
     position: relative;
     background: #fff;
     margin-bottom: 20px;
-    /* Allow vertical scrolling (pan-y), but reserve horizontal gestures for JS */
-    touch-action: pan-y;
+    /* Removed touch-action: pan-y to allow JS to preventDefault() conditionally.
+       This is crucial for preventing "both scroll" issues. */
 }
 
 .slider-wrapper {
