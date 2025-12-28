@@ -10,11 +10,11 @@
 
     <div class="content-block">
         <h1>Horizontal Slider Demo</h1>
-        <p>Scroll down to see sliders. Try swiping horizontally and vertically.</p>
-        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+        <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+        <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
     </div>
 
-    <!-- Slider 1: Free Mode -->
+    <!-- Slider 1: Snap Mode (Avito style) -->
     <div class="slider-container" id="slider1">
         <div class="slider-wrapper">
             <div class="slide" style="background-color: #ffadad;">Slide 1</div>
@@ -27,7 +27,7 @@
     </div>
 
     <div class="content-block">
-        <p>Text between sliders to test vertical scrolling.</p>
+        <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
         <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
     </div>
 
@@ -41,20 +41,20 @@
     </div>
 
     <div class="content-block">
-        <p>More content below.</p>
-        <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+        <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+        <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
         <div style="height: 1000px; background: linear-gradient(to bottom, #eee, #ccc);">
-            Tall content to ensure scrolling exists.
+            Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
         </div>
     </div>
 
-    <script src="slider.js?v=3"></script>
+    <script src="slider.js?v=4"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Initialize Slider 1 (Free Mode)
+            // Initialize Slider 1 (Snap Mode - Avito Style)
             new TouchSlider('#slider1', {
-                freeMode: true,
-                friction: 0.95
+                freeMode: false, // Snap to center
+                friction: 0.92
             });
 
             // Initialize Slider 2 (Snap Mode)

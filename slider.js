@@ -18,7 +18,7 @@ class TouchSlider {
             angleThreshold: options.angleThreshold || 65, // Degrees - increased to prioritize horizontal swipe
             speed: options.speed || 300, // ms for snap animation
             resistanceRatio: 0.5, // Resistance when pulling out of bounds
-            springK: 0.1, // Spring stiffness for rubber band
+            springK: 0.05, // Spring stiffness for rubber band (Lowered for softer bounce)
             springDamping: 0.8, // Spring damping
             ...options
         };
@@ -203,10 +203,11 @@ class TouchSlider {
             // Resistance at edges
             if (translate > this.minTranslate) {
                 const overscroll = translate - this.minTranslate;
-                translate = this.minTranslate + Math.pow(overscroll, 0.8); 
+                // Increased resistance (power 0.75 instead of 0.8) to make pulling out harder
+                translate = this.minTranslate + Math.pow(overscroll, 0.75); 
             } else if (translate < this.maxTranslate) {
                 const overscroll = this.maxTranslate - translate;
-                translate = this.maxTranslate - Math.pow(overscroll, 0.8);
+                translate = this.maxTranslate - Math.pow(overscroll, 0.75);
             }
 
             this.setTranslate(translate);
