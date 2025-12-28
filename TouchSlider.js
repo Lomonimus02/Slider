@@ -25,19 +25,19 @@ class TouchSlider {
             throw new Error('TouchSlider: элемент не найден');
         }
 
-        // Настройки по умолчанию
+        // Настройки по умолчанию (Авито-стиль)
         this.options = {
-            // Физика (оптимизированные значения для естественного поведения)
-            friction: 0.92,           // Коэффициент трения - быстрее затухание (0.9-0.98)
-            bounce: 0.15,             // Сила отскока от краев - более выраженный (0.05-0.2)
-            rubberBandEffect: 0.25,   // Коэффициент сопротивления - более упругое (0.2-0.4)
-            velocityThreshold: 0.15,  // Минимальная скорость для продолжения инерции
+            // Физика (Авито-подобное поведение)
+            friction: 0.94,           // Коэффициент трения - плавное затухание (0.9-0.98)
+            bounce: 0.12,             // Сила отскока от краев - мягкий (0.05-0.2)
+            rubberBandEffect: 0.2,    // Коэффициент сопротивления - упругое (0.2-0.4)
+            velocityThreshold: 0.1,   // Минимальная скорость для продолжения инерции
             
-            // Режимы движения
-            freeMode: true,           // true: свободное движение, false: snap к слайдам
-            snapAlign: 'start',       // 'start': слайд по левому краю, 'center': слайд по центру
-            snapSpeed: 0.12,          // Скорость довода до слайда (0.05-0.2, меньше = плавнее)
-            velocityMultiplier: 1.5,  // Множитель скорости - умеренная инерция (1.0-2.5)
+            // Режимы движения (Авито = Snap по центру)
+            freeMode: false,          // false: snap к слайдам (как Авито)
+            snapAlign: 'center',      // 'center': слайд по центру (как Авито)
+            snapSpeed: 0.15,          // Скорость довода до слайда (0.05-0.2)
+            velocityMultiplier: 1.2,  // Множитель скорости - умеренная инерция
             
             ...options
         };
@@ -682,31 +682,37 @@ class TouchSlider {
     /**
      * Применение эффекта резиновых краев (rubber band)
      * Если тянем за границу, применяем коэффициент сопротивления
+     * Используем логарифмическую функцию для более естественного ощущения
      * @param {number} position - Желаемая позиция
      * @param {number} delta - Смещение от предыдущей позиции
      * @returns {number} Скорректированная позиция с эффектом резинки
      */
     applyRubberBand(position, delta) {
         const bounds = this.getBounds();
-        const rubberBand = this.options.rubberBandEffect;
         
         // Если позиция в пределах границ, возвращаем как есть
         if (position >= bounds.min && position <= bounds.max) {
             return position;
         }
         
-        // Если вышли за правую границу (начало)
+        // Коэффициент сопротивления (0.5 = 50% от движения проходит)
+        // Увеличен для более легкого перетаскивания
+        const resistance = 0.5;
+        
+        // Если вышли за правую границу (начало, первый слайд)
         if (position > bounds.max) {
             const overshoot = position - bounds.max;
-            // Применяем сопротивление только к части, которая за границей
-            return bounds.max + overshoot * rubberBand;
+            // Логарифмическое сопротивление - чем дальше тянем, тем сильнее сопротивление
+            // Но в начале движение почти свободное
+            const dampedOvershoot = Math.sign(overshoot) * Math.pow(Math.abs(overshoot), 0.7) * resistance;
+            return bounds.max + dampedOvershoot;
         }
         
-        // Если вышли за левую границу (конец)
+        // Если вышли за левую границу (конец, последний слайд)
         if (position < bounds.min) {
             const overshoot = bounds.min - position;
-            // Применяем сопротивление только к части, которая за границей
-            return bounds.min - overshoot * rubberBand;
+            const dampedOvershoot = Math.sign(overshoot) * Math.pow(Math.abs(overshoot), 0.7) * resistance;
+            return bounds.min - dampedOvershoot;
         }
         
         return position;
