@@ -15,7 +15,7 @@ class TouchSlider {
         this.options = {
             freeMode: options.freeMode !== undefined ? options.freeMode : false,
             friction: options.friction || 0.95, // Inertia friction
-            angleThreshold: options.angleThreshold || 45, // Degrees - stricter to prevent accidental locks
+            angleThreshold: options.angleThreshold || 65, // Degrees - restored to 65 as requested
             speed: options.speed || 300, // ms for snap animation
             resistanceRatio: 0.5, // Resistance when pulling out of bounds
             springK: 0.05, // Spring stiffness for rubber band (Lowered for softer bounce)
@@ -183,8 +183,8 @@ class TouchSlider {
             const absY = Math.abs(deltaY);
             
             // Avoid locking on tiny movements
-            // We increase threshold slightly to avoid false positives on "clicks" or micro-jitters
-            if (absX < 10 && absY < 10) return;
+            // Reduced dead zone to 5px to catch the gesture BEFORE the browser starts scrolling
+            if (absX < 5 && absY < 5) return;
 
             // Angle calculation
             const angleRad = Math.atan2(absY, absX);
@@ -204,7 +204,13 @@ class TouchSlider {
 
         if (this.state.isHorizontal) {
             // Prevent native vertical scroll
-            if (e.cancelable) e.preventDefault();
+            // CRITICAL: If the event is not cancelable, it means the browser has already started scrolling.
+            // In that case, we MUST NOT move the slider, otherwise we get "double scrolling".
+            if (e.cancelable) {
+                e.preventDefault();
+            } else {
+                return;
+            }
 
             let translate = this.state.startTranslate + deltaX;
 
