@@ -1,0 +1,59 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f5f5f5;
+}
+
+.content-block {
+    padding: 20px;
+    background: white;
+    margin-bottom: 20px;
+}
+
+.slider-container {
+    width: 100%;
+    overflow: hidden; /* Hide overflow */
+    position: relative;
+    background: #fff;
+    margin-bottom: 20px;
+    /* We remove touch-action: pan-y to handle gestures manually with JS 
+       and support the custom angle threshold. 
+       We will use { passive: false } in JS listeners. */
+    /* touch-action: pan-y; */ 
+}
+
+.slider-wrapper {
+    display: flex;
+    width: 100%;
+    /* Will be moved by transform */
+    will-change: transform;
+    cursor: grab;
+}
+
+.slider-wrapper:active {
+    cursor: grabbing;
+}
+
+.slide {
+    flex-shrink: 0;
+    width: 80%; /* Default width, can be anything */
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+    margin-right: 10px; /* Spacing */
+    border-radius: 8px;
+    user-select: none; /* Prevent text selection during drag */
+}
+
+.slide.wide {
+    width: 90%;
+}
+
+.slide:last-child {
+    margin-right: 0;
+}
