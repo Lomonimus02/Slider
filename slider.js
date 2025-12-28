@@ -68,31 +68,39 @@ class TouchSlider {
     }
 
     updateDimensions() {
-        this.containerWidth = this.container.offsetWidth;
-        this.slides = Array.from(this.wrapper.children);
+        const containerRect = this.container.getBoundingClientRect();
+        this.containerWidth = containerRect.width;
         
+        const wrapperRect = this.wrapper.getBoundingClientRect();
+        
+        this.slides = Array.from(this.wrapper.children);
         this.slidesGrid = [];
         
-        let offset = 0;
+        if (this.slides.length === 0) return;
+
         this.slides.forEach(slide => {
-            // Center the slide:
-            // Position = -slideOffset + (containerWidth/2 - slideWidth/2)
-            const centerOffset = (this.containerWidth - slide.offsetWidth) / 2;
-            this.slidesGrid.push(-offset + centerOffset);
+            const slideRect = slide.getBoundingClientRect();
+            const slideWidth = slideRect.width;
+            // Calculate position relative to wrapper, independent of current transform
+            // We use the difference in client rects which is stable
+            const slideLeft = slideRect.left - wrapperRect.left;
             
-            offset += slide.offsetWidth + this.getMarginRight(slide);
+            // Center the slide:
+            // We want: slideLeft + translate + slideWidth/2 = containerWidth/2
+            // translate = (containerWidth - slideWidth)/2 - slideLeft
+            const centerOffset = (this.containerWidth - slideWidth) / 2;
+            this.slidesGrid.push(centerOffset - slideLeft);
         });
 
-        this.wrapperWidth = offset - this.getMarginRight(this.slides[this.slides.length - 1]); // Total width
+        // Calculate total wrapper width (approximate, for reference)
+        const lastSlide = this.slides[this.slides.length - 1];
+        const lastSlideRect = lastSlide.getBoundingClientRect();
+        const lastSlideLeft = lastSlideRect.left - wrapperRect.left;
+        this.wrapperWidth = lastSlideLeft + lastSlideRect.width;
         
         // Bounds based on centered positions of first and last slide
-        if (this.slidesGrid.length > 0) {
-            this.minTranslate = this.slidesGrid[0]; // First slide position
-            this.maxTranslate = this.slidesGrid[this.slidesGrid.length - 1]; // Last slide position
-        } else {
-            this.minTranslate = 0;
-            this.maxTranslate = 0;
-        }
+        this.minTranslate = this.slidesGrid[0]; // First slide position
+        this.maxTranslate = this.slidesGrid[this.slidesGrid.length - 1]; // Last slide position
     }
 
     getMarginRight(element) {
