@@ -189,10 +189,10 @@ class TouchSlider {
         this.handleTouchMove = this.handleTouchMove.bind(this);
         this.handleTouchEnd = this.handleTouchEnd.bind(this);
 
-        this.slider.addEventListener('touchstart', this.handleTouchStart, { passive: false });
+        this.slider.addEventListener('touchstart', this.handleTouchStart, { passive: true });
         this.slider.addEventListener('touchmove', this.handleTouchMove, { passive: false });
-        this.slider.addEventListener('touchend', this.handleTouchEnd);
-        this.slider.addEventListener('touchcancel', this.handleTouchEnd);
+        this.slider.addEventListener('touchend', this.handleTouchEnd, { passive: true });
+        this.slider.addEventListener('touchcancel', this.handleTouchEnd, { passive: true });
 
         // Mouse события (для тестирования на desktop)
         this.handleMouseDown = this.handleMouseDown.bind(this);
@@ -305,6 +305,9 @@ class TouchSlider {
                 
                 // Если горизонтальный свайп - активируем режим перетаскивания слайдера
                 if (this.touch.isHorizontalSwipe) {
+                    // Блокируем нативный скролл только сейчас, когда точно знаем что это горизонтальный свайп
+                    this.slider.style.touchAction = 'none';
+                    
                     // ТЕПЕРЬ останавливаем анимацию (только при горизонтальном свайпе)
                     if (this.animation.rafId) {
                         cancelAnimationFrame(this.animation.rafId);
@@ -366,6 +369,9 @@ class TouchSlider {
     handleTouchEnd(e) {
         // Сбрасываем флаг касания
         this.touch.isTouching = false;
+        
+        // Возвращаем touch-action к исходному значению
+        this.slider.style.touchAction = '';
         
         // Если это был не горизонтальный свайп (или направление не определено) - выходим
         if (!this.state.isDragging) {
