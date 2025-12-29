@@ -43,6 +43,25 @@
     <div class="content-block">
         <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
         <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+    </div>
+
+    <!-- Slider 3: Free Mode, No Centering, High Inertia -->
+    <div class="slider-container" id="slider3">
+        <div class="slider-wrapper">
+            <div class="slide" style="background-color: #ffadad;">Slide 1</div>
+            <div class="slide" style="background-color: #ffd6a5;">Slide 2</div>
+            <div class="slide" style="background-color: #fdffb6;">Slide 3</div>
+            <div class="slide" style="background-color: #caffbf;">Slide 4</div>
+            <div class="slide" style="background-color: #9bf6ff;">Slide 5</div>
+            <div class="slide" style="background-color: #a0c4ff;">Slide 6</div>
+            <div class="slide" style="background-color: #ffadad;">Slide 7</div>
+            <div class="slide" style="background-color: #ffd6a5;">Slide 8</div>
+        </div>
+    </div>
+
+    <div class="content-block">
+        <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+        <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
         <div style="height: 1000px; background: linear-gradient(to bottom, #eee, #ccc);">
             Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
         </div>
@@ -61,6 +80,13 @@
             new TouchSlider('#slider2', {
                 freeMode: false,
                 friction: 0.92
+            });
+
+            // Initialize Slider 3 (Free Mode, No Centering, High Inertia)
+            new TouchSlider('#slider3', {
+                freeMode: true,
+                centered: false, // Left aligned
+                friction: 0.96 // Reduced from 0.98 for slightly less inertia
             });
         });
     </script>

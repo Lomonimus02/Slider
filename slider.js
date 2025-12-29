@@ -14,12 +14,13 @@ class TouchSlider {
         // Options
         this.options = {
             freeMode: options.freeMode !== undefined ? options.freeMode : false,
+            centered: options.centered !== undefined ? options.centered : true, // Center slides by default
             friction: options.friction || 0.95, // Inertia friction
             angleThreshold: options.angleThreshold || 65, // Degrees - restored to 65 as requested
             speed: options.speed || 300, // ms for snap animation
             resistanceRatio: 0.5, // Resistance when pulling out of bounds
-            springK: 0.05, // Spring stiffness for rubber band (Lowered for softer bounce)
-            springDamping: 0.8, // Spring damping
+            springK: 0.03, // Very soft spring for "pillow" effect
+            springDamping: 0.95, // High damping to prevent bounce
             ...options
         };
 
@@ -72,6 +73,10 @@ class TouchSlider {
         this.containerWidth = containerRect.width;
         
         const wrapperRect = this.wrapper.getBoundingClientRect();
+        // Calculate wrapper offset relative to container (e.g. due to padding)
+        // CRITICAL: wrapperRect.left includes the current transform!
+        // We must subtract currentTranslate to get the static layout offset.
+        const wrapperOffset = (wrapperRect.left - containerRect.left) - this.state.currentTranslate;
         
         this.slides = Array.from(this.wrapper.children);
         this.slidesGrid = [];
@@ -81,26 +86,47 @@ class TouchSlider {
         this.slides.forEach(slide => {
             const slideRect = slide.getBoundingClientRect();
             const slideWidth = slideRect.width;
-            // Calculate position relative to wrapper, independent of current transform
-            // We use the difference in client rects which is stable
+            // Calculate position relative to wrapper
+            // Both rects are transformed, so the difference is stable (static position)
             const slideLeft = slideRect.left - wrapperRect.left;
             
-            // Center the slide:
-            // We want: slideLeft + translate + slideWidth/2 = containerWidth/2
-            // translate = (containerWidth - slideWidth)/2 - slideLeft
-            const centerOffset = (this.containerWidth - slideWidth) / 2;
-            this.slidesGrid.push(centerOffset - slideLeft);
+            if (this.options.centered) {
+                // Center the slide in the CONTAINER
+                // Target Visual Position = (containerWidth - slideWidth) / 2
+                // Visual Position = wrapperOffset + translate + slideLeft
+                // translate = Target - slideLeft - wrapperOffset
+                const targetPos = (this.containerWidth - slideWidth) / 2;
+                this.slidesGrid.push(targetPos - slideLeft - wrapperOffset);
+            } else {
+                // Left align (standard scrolling)
+                this.slidesGrid.push(-slideLeft);
+            }
         });
 
-        // Calculate total wrapper width (approximate, for reference)
+        // Calculate total wrapper width including last slide's margin
         const lastSlide = this.slides[this.slides.length - 1];
         const lastSlideRect = lastSlide.getBoundingClientRect();
         const lastSlideLeft = lastSlideRect.left - wrapperRect.left;
-        this.wrapperWidth = lastSlideLeft + lastSlideRect.width;
+        const lastSlideMargin = this.getMarginRight(lastSlide);
         
-        // Bounds based on centered positions of first and last slide
-        this.minTranslate = this.slidesGrid[0]; // First slide position
-        this.maxTranslate = this.slidesGrid[this.slidesGrid.length - 1]; // Last slide position
+        this.wrapperWidth = lastSlideLeft + lastSlideRect.width + lastSlideMargin;
+        
+        // Bounds
+        if (this.options.centered) {
+            this.minTranslate = this.slidesGrid[0]; // First slide position
+            this.maxTranslate = this.slidesGrid[this.slidesGrid.length - 1]; // Last slide position
+        } else {
+            // Standard scrolling bounds
+            // We use the first slide's position as the start (usually 0 or offset)
+            this.minTranslate = this.slidesGrid[0];
+            
+            // For the end, we want the right edge of the content to align with the right edge of the container.
+            // MaxScroll = ContainerWidth - WrapperWidth - WrapperOffset
+            const maxScroll = this.containerWidth - this.wrapperWidth - wrapperOffset;
+            
+            // Ensure we don't scroll past the start if content is small
+            this.maxTranslate = Math.min(this.minTranslate, maxScroll);
+        }
     }
 
     getMarginRight(element) {
@@ -217,11 +243,11 @@ class TouchSlider {
             // Resistance at edges
             if (translate > this.minTranslate) {
                 const overscroll = translate - this.minTranslate;
-                // Increased resistance (power 0.75 instead of 0.8) to make pulling out harder
-                translate = this.minTranslate + Math.pow(overscroll, 0.75); 
+                // Even softer resistance (0.25) allows pulling further
+                translate = this.minTranslate + overscroll * 0.25; 
             } else if (translate < this.maxTranslate) {
                 const overscroll = this.maxTranslate - translate;
-                translate = this.maxTranslate - Math.pow(overscroll, 0.75);
+                translate = this.maxTranslate - overscroll * 0.25;
             }
 
             this.setTranslate(translate);
@@ -266,6 +292,29 @@ class TouchSlider {
         // If velocity is very low, treat as 0
         if (Math.abs(this.state.velocity) < 0.05) this.state.velocity = 0;
 
+        // If we are already out of bounds and velocity is low (dragged and released),
+        // go straight to the smooth return.
+        if ((this.state.currentTranslate > this.minTranslate || this.state.currentTranslate < this.maxTranslate) 
+            && Math.abs(this.state.velocity) < 0.1) {
+            this.snapToBounds();
+            return;
+        }
+
+        // Snap Mode: "Magnetic" feel
+        // If not freeMode, we skip the inertia loop and go straight to the target slide.
+        // We project where the slide would land based on velocity to decide which slide to snap to.
+        if (!this.options.freeMode) {
+            // Check if we are in bounds (if out of bounds, let startInertia handle the pillow stop)
+            if (this.state.currentTranslate <= this.minTranslate && this.state.currentTranslate >= this.maxTranslate) {
+                // Project position: current + velocity * factor
+                // Factor determines how easy it is to flick to next slide.
+                // 200ms worth of velocity is a good baseline.
+                const projection = this.state.currentTranslate + (this.state.velocity * 200);
+                this.snapToNearest(projection);
+                return;
+            }
+        }
+
         this.startInertia();
     }
 
@@ -299,26 +348,21 @@ class TouchSlider {
             let isOutOfBounds = false;
 
             // Check bounds (Rubber Band Spring)
-            if (current > this.minTranslate) {
+            if (current > this.minTranslate || current < this.maxTranslate) {
                 isOutOfBounds = true;
-                force = (this.minTranslate - current) * this.options.springK;
-            } else if (current < this.maxTranslate) {
-                isOutOfBounds = true;
-                force = (this.maxTranslate - current) * this.options.springK;
             }
 
             if (isOutOfBounds) {
-                // Apply spring force
-                velocity += force * (dt / 16); // Scale by time
-                velocity *= this.options.springDamping;
+                // "Pillow" logic:
+                // Instead of a spring force that bounces back, we just apply heavy friction
+                // to stop the movement. Once stopped, we trigger a smooth return animation.
                 
-                // Stop if settled
-                if (Math.abs(velocity) < 0.01 && Math.abs(force) < 0.01) {
-                    // Snap exactly to bound
-                    current = current > this.minTranslate ? this.minTranslate : this.maxTranslate;
-                    this.setTranslate(current);
-                    this.emit('sliderStop');
-                    return;
+                velocity *= 0.6; // Very heavy friction (stops almost instantly)
+                
+                // If effectively stopped, trigger the smooth return
+                if (Math.abs(velocity) < 0.1) {
+                    this.snapToBounds();
+                    return; // Stop the physics loop
                 }
             } else {
                 // Normal Inertia
@@ -345,15 +389,19 @@ class TouchSlider {
         this.state.rafId = requestAnimationFrame(step);
     }
 
-    snapToNearest() {
+    snapToNearest(targetPosition = null) {
         // Find closest slide position
+        // If targetPosition is provided (e.g. from velocity projection), use it.
+        // Otherwise use current position.
+        const searchPos = targetPosition !== null ? targetPosition : this.state.currentTranslate;
+        
         let closest = this.slidesGrid[0];
-        let minDiff = Math.abs(this.state.currentTranslate - closest);
+        let minDiff = Math.abs(searchPos - closest);
         let closestIndex = 0;
 
         for (let i = 1; i < this.slidesGrid.length; i++) {
             const pos = this.slidesGrid[i];
-            const diff = Math.abs(this.state.currentTranslate - pos);
+            const diff = Math.abs(searchPos - pos);
             if (diff < minDiff) {
                 minDiff = diff;
                 closest = pos;
@@ -362,23 +410,38 @@ class TouchSlider {
         }
         
         // Clamp to bounds
-        // minTranslate is the upper bound (e.g. 50)
-        // maxTranslate is the lower bound (e.g. -1000)
         if (closest > this.minTranslate) closest = this.minTranslate;
         if (closest < this.maxTranslate) closest = this.maxTranslate;
 
-        this.animateTo(closest, () => {
-            this.emit('slideChange', { index: closestIndex });
+        this.animateTo(closest, {
+            duration: 500, // Slightly slower for smoothness
+            easing: (t) => 1 - Math.pow(1 - t, 4), // easeOutQuart (softer than Cubic)
+            callback: () => {
+                this.emit('slideChange', { index: closestIndex });
+            }
         });
     }
 
-    animateTo(target, callback) {
+    snapToBounds() {
+        let target = this.state.currentTranslate;
+        if (target > this.minTranslate) target = this.minTranslate;
+        else if (target < this.maxTranslate) target = this.maxTranslate;
+        else return; // Not out of bounds
+
+        // "Pillow" return: Slower duration and smoother easing
+        this.animateTo(target, {
+            duration: 700, // Even slower for "pillow" feel
+            easing: (t) => 1 - Math.pow(1 - t, 4) // easeOutQuart (very soft)
+        });
+    }
+
+    animateTo(target, options = {}) {
         const start = this.state.currentTranslate;
         const distance = target - start;
         const startTime = Date.now();
-        const duration = this.options.speed;
-
-        const easeOutQuad = (t) => t * (2 - t);
+        const duration = options.duration || this.options.speed;
+        const easing = options.easing || ((t) => t * (2 - t)); // Default easeOutQuad
+        const callback = options.callback;
 
         const loop = () => {
             // If user interrupts animation, stop
@@ -387,7 +450,7 @@ class TouchSlider {
             const now = Date.now();
             const elapsed = now - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            const ease = easeOutQuad(progress);
+            const ease = easing(progress);
 
             const newPos = start + (distance * ease);
             this.setTranslate(newPos);
